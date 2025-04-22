@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Detector de Toxicidad</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        h1 {
+            color: #333;
+        }
+        #text-input {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            font-size: 16px;
+        }
+        #check-button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        #check-button:hover {
+            background-color: #45a049;
+        }
+        #results {
+            margin-top: 20px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background-color: #f9f9f9;
+        }
+        .toxicity-category {
+            margin: 5px 0;
+        }
+        .toxicity-bar {
+            height: 20px;
+            background-color: #e0e0e0;
+            border-radius: 4px;
+            margin-bottom: 5px;
+        }
+        .toxicity-progress {
+            height: 100%;
+            border-radius: 4px;
+            background-color: #ff5722;
+            width: 0%;
+            transition: width 0.3s;
+        }
+        .loading {
+            color: #666;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+    <h1>Detector de Toxicidad en Texto</h1>
+    <p>Ingresa un texto para analizar su nivel de toxicidad:</p>
+    
+    <textarea id="text-input" rows="4" placeholder="Escribe aquí el texto a analizar..."></textarea>
+    <br>
+    <button id="check-button">Analizar Toxicidad</button>
+    
+    <div id="results">
+        <p>Los resultados aparecerán aquí...</p>
+    </div>
+
+    <!-- Cargar TensorFlow.js -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@2.0.0/dist/tf.min.js"></script>
+    <!-- Cargar el modelo de toxicidad -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/toxicity@1.2.2"></script>
+    
+    <script>
+        // Umbral de toxicidad (0 a 1)
+        const threshold = 0.5;
+        
+        // Referencias a elementos del DOM
+        const textInput = document.getElementById('text-input');
+        const checkButton = document.getElementById('check-button');
+        const resultsDiv = document.getElementById('results');
+        
+        // Cargar el modelo cuando la página esté lista
+        let model;
+        
+        async function loadModel() {
+            resultsDiv.innerHTML = '<p class="loading">Cargando modelo de toxicidad... Esto puede tomar un momento.</p>';
+            
+            try {
+                // Cargar el modelo con el umbral especificado
+                model = await toxicity.load(threshold);
+                resultsDiv.innerHTML = '<p>Modelo cargado correctamente. Ingresa un texto y haz clic en "Analizar Toxicidad".</p>';
+                checkButton.disabled = false;
+            } catch (error) {
+                resultsDiv.innerHTML = `<p style="color: red;">Error al cargar el modelo: ${error.message}</p>`;
+                console.error('Error al cargar el modelo:', error);
+            }
+        }
+        
+        // Función para analizar el texto
+        async function checkText() {
+            const text = textInput.value.trim();
+            
+            if (!text) {
+                resultsDiv.innerHTML = '<p style="color: red;">Por favor, ingresa un texto para analizar.</p>';
+                return;
+            }
+            
+            if (!model) {
+                resultsDiv.innerHTML = '<p style="color: red;">El modelo aún no ha terminado de cargar. Por favor, espera.</p>';
+                return;
+            }
+            
+            resultsDiv.innerHTML = '<p class="loading">Analizando texto... Por favor espera.</p>';
+            
+            try {
+                // Realizar la predicción
+                const predictions = await model.classify(text);
+                
+                // Mostrar resultados
+                displayResults(predictions, text);
+            } catch (error) {
+                resultsDiv.innerHTML = `<p style="color: red;">Error al analizar el texto: ${error.message}</p>`;
+                console.error('Error al analizar texto:', error);
+            }
+        }
+        
+        // Función para mostrar los resultados
+        function displayResults(predictions, text) {
+            let html = `<h3>Resultados para: "${text}"</h3>`;
+            
+            predictions.forEach(prediction => {
+                const { label, results } = prediction;
+                const { match, probabilities } = results[0];
+                
+                // Calcular porcentaje
+                const percent = Math.round(probabilities[1] * 100);
+                
+                html += `
+                    <div class="toxicity-category">
+                        <strong>${label}:</strong> ${match ? 'Sí' : 'No'} (${percent}%)
+                        <div class="toxicity-bar">
+                            <div class="toxicity-progress" style="width: ${percent}%"></div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            resultsDiv.innerHTML = html;
+        }
+        
+        // Event listeners
+        checkButton.addEventListener('click', checkText);
+        
+        // Iniciar carga del modelo cuando la página esté lista
+        document.addEventListener('DOMContentLoaded', () => {
+            checkButton.disabled = true;
+            loadModel();
+        });
+    </script>
+</body>
+</html>
